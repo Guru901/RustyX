@@ -25,5 +25,7 @@ async fn find_user(req: HttpRequest, res: HttpResponse) -> HttpResponse {
 
 async fn search(req: HttpRequest, res: HttpResponse) -> HttpResponse {
     let q = req.get_query("q").unwrap_or(String::new());
-    return res.status(200).text(format!("found for: {q}"));
+    return res
+        .status(200)
+        .text(format!("Nothing found for search: {q}"));
 }
