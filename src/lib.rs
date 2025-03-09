@@ -1,10 +1,24 @@
-use std::future::Future;
+use std::{collections::HashMap, future::Future, sync::Arc};
 
-pub struct App;
+pub type Handler = Arc<dyn Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static>;
+pub type Fut = Box<dyn Future<Output = HttpResponse> + Send + 'static>;
+
+type Route = HashMap<HttpMethods, HashMap<&'static str, Handler>>;
+
+enum HttpMethods {
+    GET,
+    PUT,
+    POST,
+    DELETE,
+}
+
+pub struct App {
+    routes: Vec<Route>,
+}
 
 impl App {
     pub fn new() -> App {
-        return App;
+        return App { routes: vec![] };
     }
 
     pub fn get<F, Fut>(&self, path: &str, handler: F)
