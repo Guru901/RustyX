@@ -1,3 +1,5 @@
+use actix_web::Responder;
+#[allow(unused)]
 use std::{collections::HashMap, future::Future, sync::Arc};
 
 pub type Handler = Arc<dyn Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static>;
@@ -14,14 +16,12 @@ enum HttpMethods {
 }
 
 pub struct App {
-    routes: Route,
+    routes: Vec<Route>,
 }
 
 impl App {
     pub fn new() -> App {
-        return App {
-            routes: HashMap::new(),
-        };
+        return App { routes: Vec::new() };
     }
 
     pub fn get(&mut self, path: &'static str, handler: Handler) {
@@ -40,21 +40,96 @@ impl App {
         self.add_route(HttpMethods::DELETE, path, handler);
     }
 
-    pub async fn listen(&self, addr: &str) {
+    pub async fn listen(self, addr: &str) {
         println!("Server listening on {}", addr);
-        actix_web::HttpServer::new(|| actix_web::App::new())
-            .bind(addr)
-            .unwrap()
-            .run()
-            .await
-            .unwrap()
+
+        let routes = self.routes;
+        actix_web::HttpServer::new(move || {
+            let mut app = actix_web::App::new();
+
+            for route in &routes {
+                for (method, paths) in route {
+                    for (path, handler) in paths {
+                        let handler_clone = handler.clone();
+                        let path_clone = path.to_string();
+
+                        let route = match method {
+                            HttpMethods::GET => actix_web::web::resource(path_clone).route(
+                                actix_web::web::get().to(move |req| {
+                                    let handler = handler_clone.clone();
+                                    async move {
+                                        let req = HttpRequest {};
+                                        let res = HttpResponse {
+                                            status_code: 200,
+                                            body: String::new(),
+                                        };
+                                        (handler)(req, res).await
+                                    }
+                                }),
+                            ),
+                            HttpMethods::POST => actix_web::web::resource(path_clone).route(
+                                actix_web::web::post().to(move |req| {
+                                    let handler = handler_clone.clone();
+                                    async move {
+                                        let req = HttpRequest {};
+                                        let res = HttpResponse {
+                                            status_code: 200,
+                                            body: String::new(),
+                                        };
+                                        (handler)(req, res).await
+                                    }
+                                }),
+                            ),
+                            HttpMethods::PUT => actix_web::web::resource(path_clone).route(
+                                actix_web::web::put().to(move |req| {
+                                    let handler = handler_clone.clone();
+                                    async move {
+                                        let req = HttpRequest {};
+                                        let res = HttpResponse {
+                                            status_code: 200,
+                                            body: String::new(),
+                                        };
+                                        (handler)(req, res).await
+                                    }
+                                }),
+                            ),
+                            HttpMethods::DELETE => actix_web::web::resource(path_clone).route(
+                                actix_web::web::delete().to(move |req| {
+                                    let handler = handler_clone.clone();
+                                    async move {
+                                        let req = HttpRequest {};
+                                        let res = HttpResponse {
+                                            status_code: 200,
+                                            body: String::new(),
+                                        };
+                                        (handler)(req, res).await
+                                    }
+                                }),
+                            ),
+                        };
+
+                        app = app.service(route);
+                    }
+                }
+            }
+
+            app
+        })
+        .bind(addr)
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
     }
 
     fn add_route(&mut self, method: HttpMethods, path: &'static str, handler: Handler) {
-        let mut hm1 = HashMap::new();
+        let mut route = HashMap::new();
+        let mut path_handlers = HashMap::new();
 
-        hm1.insert(path, handler);
-        self.routes.insert(method, hm1);
+        path_handlers.insert(path, handler);
+        route.insert(method, path_handlers);
+
+        self.routes.push(route);
     }
 }
 
@@ -77,6 +152,22 @@ impl HttpResponse {
     pub fn text(mut self, text: String) -> Self {
         self.body = text;
         return self;
+    }
+
+    fn to_responder(self) -> actix_web::HttpResponse {
+        let body = self.body;
+        actix_web::HttpResponse::build(
+            actix_web::http::StatusCode::from_u16(self.status_code as u16).unwrap(),
+        )
+        .body(body)
+    }
+}
+
+impl Responder for HttpResponse {
+    type Body = actix_web::body::BoxBody;
+
+    fn respond_to(self, _req: &actix_web::HttpRequest) -> actix_web::HttpResponse {
+        self.to_responder()
     }
 }
 
