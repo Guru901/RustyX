@@ -5,6 +5,7 @@ pub type Fut = Box<dyn Future<Output = HttpResponse> + Send + 'static>;
 
 type Route = HashMap<HttpMethods, HashMap<&'static str, Handler>>;
 
+#[derive(Eq, Hash, PartialEq)]
 enum HttpMethods {
     GET,
     PUT,
@@ -13,40 +14,30 @@ enum HttpMethods {
 }
 
 pub struct App {
-    routes: Vec<Route>,
+    routes: Route,
 }
 
 impl App {
     pub fn new() -> App {
-        return App { routes: vec![] };
+        return App {
+            routes: HashMap::new(),
+        };
     }
 
-    pub fn get<F, Fut>(&self, path: &str, handler: F)
-    where
-        F: Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = HttpResponse> + Send + 'static,
-    {
+    pub fn get(&mut self, path: &'static str, handler: Handler) {
+        self.add_route(HttpMethods::GET, path, handler);
     }
 
-    pub fn post<F, Fut>(&self, path: &str, handler: F)
-    where
-        F: Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = HttpResponse> + Send + 'static,
-    {
+    pub fn post(&mut self, path: &'static str, handler: Handler) {
+        self.add_route(HttpMethods::POST, path, handler);
     }
 
-    pub fn put<F, Fut>(&self, path: &str, handler: F)
-    where
-        F: Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = HttpResponse> + Send + 'static,
-    {
+    pub fn put(&mut self, path: &'static str, handler: Handler) {
+        self.add_route(HttpMethods::PUT, path, handler);
     }
 
-    pub fn delete<F, Fut>(&self, path: &str, handler: F)
-    where
-        F: Fn(HttpRequest, HttpResponse) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = HttpResponse> + Send + 'static,
-    {
+    pub fn delete(&mut self, path: &'static str, handler: Handler) {
+        self.add_route(HttpMethods::DELETE, path, handler);
     }
 
     pub async fn listen(&self, addr: &str) {
@@ -57,6 +48,13 @@ impl App {
             .run()
             .await
             .unwrap()
+    }
+
+    fn add_route(&mut self, method: HttpMethods, path: &'static str, handler: Handler) {
+        let mut hm1 = HashMap::new();
+
+        hm1.insert(path, handler);
+        self.routes.insert(method, hm1);
     }
 }
 
